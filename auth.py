@@ -1,17 +1,17 @@
-import requests 
-from dotenv import load_dotenv
+import requests
 import os
 import base64
-
+from dotenv import load_dotenv
 
 load_dotenv()
-def get_token():
-    client_id = os.getenv("id")
-    client_secret = os.getenv("client_secret")
 
+client_id = os.getenv("id")
+client_secret = os.getenv("client_secret")
+redirect_uri = "http://127.0.0.1:3000/callback"
+
+def get_access_token_from_code(code):
     auth_str = f"{client_id}:{client_secret}"
-    auth_bytes = auth_str.encode("utf-8")
-    auth_base64 = base64.b64encode(auth_bytes).decode("utf-8")
+    auth_base64 = base64.b64encode(auth_str.encode()).decode()
 
     url = "https://accounts.spotify.com/api/token"
 
@@ -19,13 +19,16 @@ def get_token():
         "Authorization": f"Basic {auth_base64}",
         "Content-Type": "application/x-www-form-urlencoded"
     }
+
     data = {
-        "grant_type": "client_credentials"
+        "grant_type": "authorization_code",
+        "code": code,
+        "redirect_uri": redirect_uri
     }
 
-    response = requests.post(url,headers=headers,data=data)
+    response = requests.post(url, headers=headers, data=data)
+
     if response.status_code != 200:
-        raise Exception(f"Erro na autenticação: {response.text}")
-    
-    token = response.json()["access_token"]
-    return token
+        raise Exception(f"Erro ao gerar token: {response.text}")
+
+    return response.json()["access_token"]
