@@ -4,6 +4,8 @@ import os
 from flask import Flask, request
 import auth
 import extract
+import spark_processing
+from pyspark.sql.functions import current_date
 
 load_dotenv()
 
@@ -31,10 +33,22 @@ def callback():
 
     try:
         token = auth.get_access_token_from_code(code)
-
         dados = extract.get_top_artists(token)
 
-        return dados
+        spark = spark_processing.create_spark_session()
+        df = spark_processing.json_to_dataframe(spark,dados)
+        spark.conf.set("spark.hadoop.io.native.lib.available", "false")
+        df = df.withColumn("ingest_date", current_date())
+
+        (df.write 
+            .mode("append") 
+            .partitionBy("ingest_date") 
+            .parquet("C:\\data_lake\\raw\\api_spotify\\tb_raw_spotify_top_artists")
+        )
+        df2 = spark.read.parquet("C:\\data_lake\\raw\\api_spotify\\tb_raw_spotify_top_artists")
+        df2.show()
+
+        return "Dados carregados no spark com sucesso!"
 
     except Exception as e:
         return str(e)
